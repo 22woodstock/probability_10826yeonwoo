@@ -6,21 +6,19 @@
 <title>프로젝트 | 동전 던지기에서 유전체 조립까지</title>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     [이미지 안내]  repo 안에 images/ 폴더를 만들고 아래 이름 그대로 저장하세요.
-     파일명이 다르면 본문 <img src="..."> 의 경로만 바꾸면 됩니다.
+     [이미지 안내]  repo 안에 images/ 폴더를 만들고 아래 파일을 넣으세요.
+     함께 드린 images 폴더를 통째로 복사하면 그대로 맞습니다.
 
-       images/fig1-code-random.png     탭2 · 난수 시뮬레이션 코드 화면
-       images/fig2-code-fair.png       탭2 · 초기면 보정 코드 화면
-       images/fig3-convergence.png     탭3 · 시행횟수에 따른 확률 수렴 그래프
-       images/fig4-range.png           탭3 · n값에 따른 최대 변동폭 그래프
-       images/fig5-matrix-code.png     탭3 · numpy 전이행렬 계산 화면
-       images/fig6-riffle.png          탭4 · 리플 셔플 과정
-       images/fig7-tvd.png             탭4 · 셔플 횟수와 전변동거리 그래프
-       images/fig8-ramsey.png          탭5 · R(3,3)=6 증명 그림
-       images/fig9-konigsberg.png      탭7 · 쾨니히스베르크 다리
-       images/fig10-assembly.png       탭8 · 유전체 조립 개요
+       images/fig2-convergence.png        탭3 · 통계적 확률의 수렴 그래프
+       images/fig3-range.png              탭3 · n값에 따른 최대 변동폭
+       images/fig4-ramsey-pigeonhole.png  탭5 · R(3,3) 증명 · 비둘기집
+       images/fig5-ramsey-case.png        탭5 · R(3,3) 증명 · 경우 나누기
+       images/fig7-konigsberg.png         탭7 · 쾨니히스베르크의 다리
+       images/fig8-euler-degree.png       탭7 · 홀수 차수와 존재 조건
 
-     이미지가 아직 없으면 자리표시 상자가 대신 뜹니다(레이아웃 안 깨짐).
+     [그림 1] 마르코프 상태 전이도와 [그림 6] 드 브루인 그래프는
+     코드 안에 SVG로 그려져 있어 이미지 파일이 필요 없습니다.
+     이미지가 없으면 자리표시 상자가 대신 뜹니다(레이아웃 안 깨짐).
      ═══════════════════════════════════════════════════════════════ -->
 
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
@@ -328,10 +326,6 @@ for i in range(n):
 
 print(f"100번 던지는 시행을 {n}번 했을 때 같은 면이 연속으로 {k}번 이상 나올 확률: {len(prob)/n}")</code></pre>
 
-    <figure data-file="images/fig1-code-random.png">
-      <img src="images/fig1-code-random.png" alt="난수 모듈을 이용한 동전 던지기 시뮬레이션 코드 화면">
-      <figcaption>[그림 1] 코드 구현 화면 1 — 난수 모듈 기반 시뮬레이션</figcaption>
-    </figure>
 
     <h4>출력값 (k = 5 기준)</h4>
     <div class="table-wrap">
@@ -387,10 +381,6 @@ for _ in range(n):
 
 print(f"같은 면이 연속으로 {k}번 이상 나올 확률: {success/n:.4f}")</code></pre>
 
-    <figure data-file="images/fig2-code-fair.png">
-      <img src="images/fig2-code-fair.png" alt="초기 면을 난수로 정한 동전 던지기 코드 화면">
-      <figcaption>[그림 2] 코드 구현 화면 2 — 초기 조건을 난수로 보정</figcaption>
-    </figure>
 
     <p>출력값은 앞의 결과와 크게 다르지 않았다. 정말 공정해진 것인지 수식으로 확인했다. 원리는 <strong>조건부 확률</strong>이다.</p>
 
@@ -479,7 +469,7 @@ print(f"같은 면이 연속으로 {k}번 이상 나올 확률: {success/n:.4f}"
         <text x="590" y="182" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" fill="#78867F">흡수 상태</text>
       </svg>
     </div>
-    <p class="figcap">[그림 3] 다섯 상태의 전이 관계. 오른쪽으로 가면 연속이 늘고, 아래 곡선으로 돌아오면 연속이 끊긴다.</p>
+    <p class="figcap">[그림 1] 다섯 상태의 전이 관계. 오른쪽으로 가면 연속이 늘고, 아래 곡선으로 돌아오면 연속이 끊긴다.</p>
 
     <h3>전이행렬로 표현</h3>
     <p>위 관계를 행렬 하나로 압축한다. 상태 순서는 \((a,b,c,d,e)\)다.</p>
@@ -511,10 +501,6 @@ np.set_printoptions(precision=6, suppress=True)
 print("P^100 =")
 print(P100)</code></pre>
 
-    <figure data-file="images/fig5-matrix-code.png">
-      <img src="images/fig5-matrix-code.png" alt="numpy로 전이행렬을 100번 곱하는 코드와 출력값">
-      <figcaption>[그림 4] 코드 화면과 출력값 — 전이행렬의 100제곱</figcaption>
-    </figure>
 
     <div class="eq">
       $$P^{100}=\begin{bmatrix}
@@ -528,15 +514,15 @@ print(P100)</code></pre>
     <p>구하려는 값은 <strong>a행 e열의 원소, 즉 0.972715</strong>다. 연속이 1인 상태에서 출발해 100번 던졌을 때 흡수 상태 \(e\)에 도달해 있을 확률이며, 이것이 수학적 확률이다.</p>
 
     <h3>큰 수의 법칙 — 두 확률의 비교</h3>
-    <figure data-file="images/fig3-convergence.png">
-      <img src="images/fig3-convergence.png" alt="시행 횟수 n에 따른 통계적 확률과 수학적 확률 비교 그래프">
-      <figcaption>[그림 5] 시행횟수 n에 따른 통계적 확률과 수학적 확률(점선)</figcaption>
+    <figure data-file="images/fig2-convergence.png">
+      <img src="images/fig2-convergence.png" alt="시행 횟수 n에 따른 통계적 확률과 수학적 확률 비교 그래프">
+      <figcaption>[그림 2] 시행횟수 n에 따른 통계적 확률과 수학적 확률(점선)</figcaption>
     </figure>
     <p>[표 1]의 평균값을 수학적 확률 0.972715와 비교하면, <strong>시행 횟수 n이 커질수록 통계적 확률이 수학적 확률로 수렴</strong>한다. 큰 수의 법칙이 눈으로 확인되는 지점이다.</p>
 
-    <figure data-file="images/fig4-range.png">
-      <img src="images/fig4-range.png" alt="n값에 따른 최대 변동폭 막대그래프">
-      <figcaption>[그림 6] n값에 따른 최대 변동폭(범위) 비교</figcaption>
+    <figure data-file="images/fig3-range.png">
+      <img src="images/fig3-range.png" alt="n값에 따른 최대 변동폭 막대그래프">
+      <figcaption>[그림 3] n값에 따른 최대 변동폭(범위) 비교</figcaption>
     </figure>
     <p>수렴은 평균값에서만 일어나지 않는다. 5회 시행의 최대 변동폭(범위)을 보면 n이 커질수록 폭이 뚜렷하게 줄어든다. 원인은 이렇게 분석했다 — <strong>n이 커질수록 한 번의 예외적인 시행이 전체 확률에서 차지하는 비중이 작아지기 때문</strong>이다.</p>
 
@@ -558,10 +544,6 @@ print(P100)</code></pre>
     <h3>리플 셔플</h3>
     <p>카드를 두 더미로 나눈 뒤 교차시켜 섞는 방식이다. 리플 셔플의 특징은 <strong>섞은 뒤에도 일정한 규칙성을 가진 부분집합이 남는다</strong>는 것이다. 이 잔여 규칙성이 바로 부분패턴이고, 무작위성을 측정하는 열쇠가 된다.</p>
 
-    <figure data-file="images/fig6-riffle.png">
-      <img src="images/fig6-riffle.png" alt="리플 셔플 과정 도해">
-      <figcaption>[그림 7] 리플 셔플 — 두 더미로 나눈 뒤 교차 낙하</figcaption>
-    </figure>
 
     <p>대부분의 사람은 카드를 &ldquo;많이 섞을수록 무작위에 가까워진다&rdquo;고 생각한다. 하지만 무한히 섞을 필요는 없다. <strong>최적의 임계점이 존재</strong>한다.</p>
 
@@ -612,10 +594,6 @@ print(P100)</code></pre>
       </table>
     </div>
 
-    <figure data-file="images/fig7-tvd.png">
-      <img src="images/fig7-tvd.png" alt="셔플 횟수에 따른 전변동거리 변화 그래프">
-      <figcaption>[그림 8] 셔플 횟수와 전변동거리 — 7회 부근의 급격한 하강</figcaption>
-    </figure>
 
     <h4>일반화</h4>
     <p>정보이론(엔트로피)의 관점에서, 카드 덱의 순서를 완전히 지우는 데 필요한 정보량으로부터 일반식이 나온다.</p>
@@ -667,9 +645,16 @@ print(P100)</code></pre>
     <p>\(K_5\)의 꼭짓점을 오각형으로 배치하고, 오각형의 <strong>변 5개는 빨강</strong>, <strong>대각선 5개는 파랑</strong>으로 칠하면 단색 삼각형이 하나도 생기지 않는다. 이 반례 하나로 5는 답이 될 수 없다.</p>
     <p>①과 ②를 합치면 \(R(3,3)=6\)이다.</p>
 
-    <figure data-file="images/fig8-ramsey.png">
-      <img src="images/fig8-ramsey.png" alt="R(3,3)=6 증명 그림 — K6의 2색 칠하기와 K5 반례">
-      <figcaption>[그림 9] \(K_6\)에서는 단색 삼각형이 반드시 생기고, \(K_5\)에는 반례가 존재한다</figcaption>
+    <figure data-file="images/fig4-ramsey-pigeonhole.png">
+      <img src="images/fig4-ramsey-pigeonhole.png" alt="R(3,3)=6 증명 — 비둘기집 원리 적용">
+      <figcaption>[그림 4] 한 정점에서 나가는 5개의 간선을 두 색으로 칠하면 한 색이 3개 이상이다</figcaption>
+    </figure>
+
+    <p>이제 세 사람 사이의 간선을 따져 보면 두 경우로 갈린다.</p>
+
+    <figure data-file="images/fig5-ramsey-case.png">
+      <img src="images/fig5-ramsey-case.png" alt="R(3,3)=6 증명 — 경우 나누기">
+      <figcaption>[그림 5] 세 간선 중 하나라도 빨강이면 빨강 삼각형, 모두 파랑이면 파랑 삼각형이 생긴다</figcaption>
     </figure>
 
     <div class="callout">
@@ -751,7 +736,7 @@ print(P100)</code></pre>
         </g>
       </svg>
     </div>
-    <p class="figcap">[그림 10] \(B(2,3)\)의 드 브루인 그래프. 각 간선에 붙은 세 자리 문자열이 8개 부분수열 전부다.</p>
+    <p class="figcap">[그림 6] \(B(2,3)\)의 드 브루인 그래프. 각 간선에 붙은 세 자리 문자열이 8개 부분수열 전부다.</p>
 
     <p>이 그래프에서 <strong>모든 간선을 한 번씩 지나는 경로</strong>를 찾으면, 지나간 간선의 이름을 이어 붙인 것이 곧 드 브루인 수열이다.</p>
     <div class="eq">$$00 \to 00 \to 01 \to 10 \to 01 \to 11 \to 11 \to 10 \to 00$$</div>
@@ -790,9 +775,9 @@ print(P100)</code></pre>
     <h3>쾨니히스베르크의 다리</h3>
     <p>강으로 나뉜 네 지역을 일곱 개의 다리가 잇는다. 모든 다리를 한 번씩만 건너 원래 자리로 돌아올 수 있는가? 그래프로 옮기면 정점 4개, 간선 7개이고 각 정점의 차수는 A: 5, B: 3, C: 3, D: 3이다.</p>
 
-    <figure data-file="images/fig9-konigsberg.png">
-      <img src="images/fig9-konigsberg.png" alt="쾨니히스베르크의 다리와 이를 옮긴 그래프">
-      <figcaption>[그림 11] 쾨니히스베르크의 다리 — 정점 4개, 간선 7개, 홀수 차수 정점 4개</figcaption>
+    <figure data-file="images/fig7-konigsberg.png">
+      <img src="images/fig7-konigsberg.png" alt="쾨니히스베르크의 다리와 이를 옮긴 그래프">
+      <figcaption>[그림 7] 쾨니히스베르크의 다리 — 정점 4개, 간선 7개, 홀수 차수 정점 4개</figcaption>
     </figure>
 
     <p><strong>홀수 차수 정점이 4개</strong>다. 따라서 오일러 경로도, 오일러 회로도 존재하지 않는다. 답은 &ldquo;불가능하다&rdquo;.</p>
@@ -809,6 +794,11 @@ print(P100)</code></pre>
         </tbody>
       </table>
     </div>
+
+    <figure data-file="images/fig8-euler-degree.png">
+      <img src="images/fig8-euler-degree.png" alt="홀수 차수 정점 개수에 따른 오일러 경로·회로 존재 여부">
+      <figcaption>[그림 8] 홀수 차수가 2개면 경로만, 0개면 회로까지 존재한다</figcaption>
+    </figure>
     <p>이유는 단순하다. 어떤 정점을 지나갈 때마다 간선을 하나 쓰고 들어가서 하나 쓰고 나온다. 즉 <strong>간선은 항상 짝으로 소비</strong>된다. 짝이 맞지 않는 정점은 출발점이거나 도착점일 수밖에 없고, 그런 정점은 최대 2개까지만 허용된다.</p>
 
     <h3>존재 조건 — 유향 그래프</h3>
@@ -847,10 +837,6 @@ print(P100)</code></pre>
     <h3>문제 상황 — 짧은 조각만 주어진다</h3>
     <p>차세대 시퀀싱(NGS)은 유전체를 통째로 읽지 못한다. DNA를 무작위로 잘게 부순 뒤 각 조각의 앞부분 100~300염기만 읽어 내는데, 이 조각을 <strong>read</strong>라 한다. 인간 유전체 하나를 읽으면 수억 개의 read가 나오고, <strong>이들이 원래 어느 위치에서 왔는지에 대한 정보는 전혀 남지 않는다.</strong> 순서를 잃어버린 수억 조각으로 원본을 복원하는 것이 <strong>유전체 조립(genome assembly)</strong>이다.</p>
 
-    <figure data-file="images/fig10-assembly.png">
-      <img src="images/fig10-assembly.png" alt="시퀀싱 read로부터 유전체를 조립하는 과정 개요">
-      <figcaption>[그림 12] 유전체 조립의 흐름 — 시퀀싱 → k-mer 분해 → 그래프 구성 → 경로 탐색</figcaption>
-    </figure>
 
     <h3>read를 k-mer로 쪼개기</h3>
     <p>조립 알고리즘은 read를 그대로 쓰지 않고 길이 \(k\)의 부분 문자열, 즉 <strong>k-mer</strong>로 잘게 나눈다. 예를 들어 read <code>ATGGCGT</code>를 \(k=3\)으로 나누면 <code>ATG</code>, <code>TGG</code>, <code>GGC</code>, <code>GCG</code>, <code>CGT</code>가 된다.</p>
