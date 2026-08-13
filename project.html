@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프로젝트 | 동전 던지기에서 유전체 조립까지</title>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     [이미지 안내]  repo 안에 images/ 폴더를 만들고 아래 이름 그대로 저장하세요.
+     파일명이 다르면 본문 <img src="..."> 의 경로만 바꾸면 됩니다.
+
+       images/fig1-code-random.png     탭2 · 난수 시뮬레이션 코드 화면
+       images/fig2-code-fair.png       탭2 · 초기면 보정 코드 화면
+       images/fig3-convergence.png     탭3 · 시행횟수에 따른 확률 수렴 그래프
+       images/fig4-range.png           탭3 · n값에 따른 최대 변동폭 그래프
+       images/fig5-matrix-code.png     탭3 · numpy 전이행렬 계산 화면
+       images/fig6-riffle.png          탭4 · 리플 셔플 과정
+       images/fig7-tvd.png             탭4 · 셔플 횟수와 전변동거리 그래프
+       images/fig8-ramsey.png          탭5 · R(3,3)=6 증명 그림
+       images/fig9-konigsberg.png      탭7 · 쾨니히스베르크 다리
+       images/fig10-assembly.png       탭8 · 유전체 조립 개요
+
+     이미지가 아직 없으면 자리표시 상자가 대신 뜹니다(레이아웃 안 깨짐).
+     ═══════════════════════════════════════════════════════════════ -->
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- 수식 렌더링(KaTeX) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<style>
+:root{
+  --bg:#F1F2F0;
+  --card:#FFFFFF;
+  --ink:#15201C;
+  --ink-2:#41504A;
+  --ink-3:#78867F;
+  --line:#E2E5E1;
+  --green:#2F5D50;
+  --green-dark:#1E3F36;
+  --green-soft:#EBF1EE;
+  --accent:#0F1512;
+  --code-bg:#111814;
+  --font-sans:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,"Malgun Gothic",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --radius:20px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--font-sans);
+  font-size:16px; line-height:1.78;
+  -webkit-font-smoothing:antialiased;
+  word-break:keep-all;
+}
+a{color:var(--green);}
+
+/* ── 상단 바 ─────────────────────────────────────────── */
+.topbar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px clamp(16px,3vw,32px);
+  background:rgba(241,242,240,.86);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.back{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:13.5px; font-weight:600; color:var(--ink-2); text-decoration:none;
+  padding:7px 14px; border-radius:100px; border:1px solid var(--line); background:var(--card);
+  transition:border-color .18s, color .18s;
+}
+.back:hover{ color:var(--green); border-color:var(--green); }
+.topbar .who{ font-size:12.5px; color:var(--ink-3); letter-spacing:.02em; }
+
+/* ── 레이아웃 ─────────────────────────────────────────── */
+.layout{
+  display:grid;
+  grid-template-columns:236px minmax(0,1fr);
+  gap:clamp(16px,2.2vw,28px);
+  max-width:1400px;
+  margin:0 auto;
+  padding:clamp(16px,3vw,34px) clamp(14px,3vw,32px) 72px;
+  align-items:start;
+}
+
+/* ── 사이드바 ────────────────────────────────────────── */
+.sidebar{ position:sticky; top:78px; }
+.sidebar h2{
+  font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--ink-3); margin:0 0 14px 6px; font-weight:700;
+}
+.tabs{ display:flex; flex-direction:column; gap:8px; }
+.tab{
+  --n:"";
+  display:flex; align-items:center; gap:10px;
+  width:100%; text-align:left;
+  font-family:inherit; font-size:13.5px; font-weight:600; line-height:1.4;
+  color:var(--ink-2);
+  background:#E8EAE7; border:1px solid transparent;
+  border-radius:100px; padding:13px 16px;
+  cursor:pointer;
+  transition:background .18s, color .18s, transform .18s;
+}
+.tab .num{
+  font-family:var(--font-mono); font-size:11px; font-weight:500;
+  color:var(--ink-3); flex:none; min-width:14px;
+}
+.tab:hover{ background:#DFE3DF; }
+.tab:focus-visible{ outline:2px solid var(--green); outline-offset:2px; }
+.tab[aria-selected="true"]{
+  background:var(--accent); color:#fff;
+}
+.tab[aria-selected="true"] .num{ color:rgba(255,255,255,.55); }
+
+/* ── 본문 카드 ───────────────────────────────────────── */
+.panel{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:clamp(26px,4vw,60px) clamp(20px,4vw,64px);
+  box-shadow:0 1px 2px rgba(21,32,28,.04), 0 12px 34px rgba(21,32,28,.045);
+}
+.panel[hidden]{ display:none; }
+.panel-in{ animation:fade .32s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes fade{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
+
+.kicker{
+  font-family:var(--font-mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 10px;
+}
+.panel h1{
+  font-size:clamp(24px,3.2vw,36px); font-weight:800; letter-spacing:-.028em;
+  color:var(--green-dark); margin:0 0 6px; line-height:1.3;
+}
+.lede{
+  font-size:clamp(15px,1.6vw,17.5px); color:var(--ink-2);
+  margin:0 0 34px; padding-bottom:26px; border-bottom:1px solid var(--line);
+}
+.panel h3{
+  font-size:clamp(18px,2.1vw,22px); font-weight:700; color:var(--green);
+  letter-spacing:-.02em; margin:44px 0 14px; line-height:1.4;
+}
+.panel h4{
+  font-size:15.5px; font-weight:700; color:var(--ink); margin:28px 0 10px;
+}
+.panel p{ margin:0 0 16px; color:var(--ink-2); }
+.panel strong{ color:var(--ink); font-weight:700; }
+.panel ul,.panel ol{ margin:0 0 18px; padding-left:22px; color:var(--ink-2); }
+.panel li{ margin-bottom:9px; }
+.panel li::marker{ color:var(--green); }
+
+/* 강조 박스 */
+.callout{
+  border-left:3px solid var(--green);
+  background:var(--green-soft);
+  border-radius:0 14px 14px 0;
+  padding:20px 24px;
+  margin:26px 0;
+}
+.callout p:last-child{ margin-bottom:0; }
+.callout .label{
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--green); display:block; margin-bottom:6px;
+}
+
+/* 표 */
+.table-wrap{ overflow-x:auto; margin:22px 0; -webkit-overflow-scrolling:touch; }
+table{ border-collapse:collapse; width:100%; min-width:520px; font-size:14px; }
+th,td{ padding:11px 14px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+th:first-child,td:first-child{ text-align:left; font-weight:600; color:var(--ink); }
+thead th{
+  font-family:var(--font-mono); font-size:12px; font-weight:500;
+  color:var(--ink-3); border-bottom:1.5px solid var(--ink-3);
+}
+tbody tr:last-child td{ border-bottom:none; }
+tr.total td{ background:var(--green-soft); font-weight:700; color:var(--green-dark); }
+caption{ caption-side:bottom; padding-top:12px; font-size:12.5px; color:var(--ink-3); text-align:left; }
+
+/* 코드 */
+pre{
+  background:var(--code-bg); color:#D7E6DC;
+  border-radius:14px; padding:20px 22px; overflow-x:auto;
+  font-family:var(--font-mono); font-size:13px; line-height:1.72; margin:20px 0;
+}
+code{ font-family:var(--font-mono); font-size:.9em; }
+p code,li code{ background:var(--green-soft); color:var(--green-dark); padding:2px 6px; border-radius:5px; }
+
+/* 그림 */
+figure{ margin:26px 0; }
+figure img{ width:100%; height:auto; display:block; border-radius:14px; border:1px solid var(--line); background:#fafbfa; }
+figcaption{ font-size:12.5px; color:var(--ink-3); margin-top:10px; }
+figure.missing img{ display:none; }
+figure.missing::before{
+  content:"이미지 자리 — " attr(data-file);
+  display:flex; align-items:center; justify-content:center;
+  min-height:170px; border:1.5px dashed #C7CEC9; border-radius:14px;
+  font-family:var(--font-mono); font-size:12.5px; color:var(--ink-3);
+  background:repeating-linear-gradient(45deg,#F7F8F7 0 10px,#F1F2F0 10px 20px);
+  padding:16px; text-align:center;
+}
+.svg-figure{
+  border:1px solid var(--line); border-radius:14px; background:#FBFCFB; padding:18px 12px;
+}
+.svg-figure svg{ width:100%; height:auto; display:block; }
+.figcap{ font-size:12.5px!important; color:var(--ink-3)!important; margin-top:10px!important; }
+
+/* 수식 블록 */
+.eq{
+  background:#F7F9F8; border:1px solid var(--line); border-radius:12px;
+  padding:16px 20px; margin:20px 0; overflow-x:auto;
+}
+.katex-display{ margin:.4em 0!important; }
+
+/* 참고문헌 */
+.refs{ margin-top:44px; padding-top:24px; border-top:1px solid var(--line); }
+.refs ol{ font-size:13.5px; color:var(--ink-3); }
+.refs a{ word-break:break-all; }
+
+/* ── 반응형 ─────────────────────────────────────────── */
+@media (max-width:900px){
+  .layout{ grid-template-columns:1fr; }
+  .sidebar{ position:sticky; top:57px; z-index:40; margin:0 -14px; padding:10px 14px;
+            background:rgba(241,242,240,.94); backdrop-filter:blur(10px); }
+  .sidebar h2{ display:none; }
+  .tabs{ flex-direction:row; overflow-x:auto; gap:7px; padding-bottom:4px; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{ white-space:nowrap; flex:none; padding:10px 15px; font-size:13px; }
+}
+@media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important;} }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="back" href="index.html">← 처음으로</a>
+  <span class="who">확률과 조합으로 본 무작위성의 구조 · 10826 정연우</span>
+</header>
+
+<div class="layout">
+
+  <!-- ══════════ 사이드바 ══════════ -->
+  <aside class="sidebar">
+    <h2>Projects</h2>
+    <div class="tabs" role="tablist" aria-label="프로젝트 목차">
+      <button class="tab" role="tab" id="tab-1" aria-controls="panel-1" aria-selected="true"><span class="num">01</span>들어가며</button>
+      <button class="tab" role="tab" id="tab-2" aria-controls="panel-2" aria-selected="false"><span class="num">02</span>동전 던지기 — 통계적 확률</button>
+      <button class="tab" role="tab" id="tab-3" aria-controls="panel-3" aria-selected="false"><span class="num">03</span>마르코프 체인과 수학적 확률</button>
+      <button class="tab" role="tab" id="tab-4" aria-controls="panel-4" aria-selected="false"><span class="num">04</span>부분패턴과 리플 셔플</button>
+      <button class="tab" role="tab" id="tab-5" aria-controls="panel-5" aria-selected="false"><span class="num">05</span>램지 이론</button>
+      <button class="tab" role="tab" id="tab-6" aria-controls="panel-6" aria-selected="false"><span class="num">06</span>드 브루인 수열</button>
+      <button class="tab" role="tab" id="tab-7" aria-controls="panel-7" aria-selected="false"><span class="num">07</span>오일러 회로와 해밀턴 경로</button>
+      <button class="tab" role="tab" id="tab-8" aria-controls="panel-8" aria-selected="false"><span class="num">08</span>유전체 조립 — 생명과학과의 연관성</button>
+    </div>
+  </aside>
+
+  <!-- ══════════ 본문 ══════════ -->
+  <main>
+
+  <!-- ─────────── 01 들어가며 ─────────── -->
+  <section class="panel panel-in" id="panel-1" role="tabpanel" aria-labelledby="tab-1">
+    <p class="kicker">Introduction</p>
+    <h1>들어가며</h1>
+    <p class="lede">무작위는 저절로 생기지 않는다. 몇 번을 흔들어야, 몇 번을 던져야 무작위가 되는가 — 이 포트폴리오는 그 질문을 확률과 조합 두 방향에서 따라간다.</p>
+
+    <h3>두 개의 탐구, 하나의 질문</h3>
+    <p>이 사이트는 성격이 달라 보이는 두 탐구를 하나로 묶었다. 하나는 동전을 100번 던졌을 때 같은 면이 연속 5번 이상 나올 확률을 시뮬레이션과 수식 양쪽으로 계산한 <strong>확률 탐구</strong>이고, 다른 하나는 수열과 그래프 안에 숨은 규칙적 구조를 다루는 <strong>부분패턴(조합론) 탐구</strong>다.</p>
+    <p>두 탐구는 우연히 같은 도구를 쓴다. 바로 <strong>마르코프 체인</strong>이다. 동전 던지기에서는 상태 전이행렬을 100번 곱해 확률이 0.9727로 수렴하는 것을 확인했고, 리플 셔플에서는 카드 덱의 배열 분포가 균등분포에 얼마나 가까워졌는지를 같은 언어로 측정했다. 한쪽은 &ldquo;충분히 반복하면 어디로 수렴하는가&rdquo;를, 다른 쪽은 &ldquo;몇 번 만에 수렴하는가&rdquo;를 묻는다.</p>
+
+    <div class="callout">
+      <span class="label">이 포트폴리오의 축</span>
+      <p>① 무작위는 어디로 수렴하는가 — 큰 수의 법칙과 전이행렬 (02·03)<br>
+         ② 무작위는 몇 번 만에 만들어지는가 — 상승수열과 상전이 (04)<br>
+         ③ 충분히 큰 구조에는 반드시 질서가 생긴다 — 램지 이론 (05)<br>
+         ④ 모든 부분패턴을 한 번씩만 담는 최소 구조 — 드 브루인 수열과 오일러 회로 (06·07)<br>
+         ⑤ 그 구조가 실제로 하는 일 — 유전체 조립 (08)</p>
+    </div>
+
+    <h3>왜 마지막이 유전체 조립인가</h3>
+    <p>드 브루인 수열은 순수 조합론의 대상처럼 보이지만, 오늘날 가장 큰 규모로 쓰이는 곳은 생명과학이다. 차세대 시퀀서는 유전체를 통째로 읽지 못하고 수백 염기짜리 짧은 조각(read)으로만 읽는다. 이 조각들을 원래 순서로 되돌리는 문제는 <strong>드 브루인 그래프 위에서 오일러 경로를 찾는 문제</strong>로 정확히 번역된다. 06·07번 탭에서 증명한 내용이 8번 탭에서 그대로 도구가 된다.</p>
+
+    <h3>구성</h3>
+    <ul>
+      <li><strong>02–03</strong> 동전 던지기: 파이썬 난수 시뮬레이션 → 점화식 → 마르코프 체인 → 큰 수의 법칙</li>
+      <li><strong>04–05</strong> 부분패턴: 리플 셔플과 다이아코니스 정리, 램지 이론</li>
+      <li><strong>06–07</strong> 드 브루인 수열, 오일러 회로와 해밀턴 경로</li>
+      <li><strong>08</strong> 유전체 조립 — 앞의 모든 도구가 실제로 쓰이는 자리</li>
+    </ul>
+  </section>
+
+  <!-- ─────────── 02 통계적 확률 ─────────── -->
+  <section class="panel" id="panel-2" role="tabpanel" aria-labelledby="tab-2" hidden>
+    <p class="kicker">Part 1 — Probability</p>
+    <h1>동전 던지기 — 통계적 확률</h1>
+    <p class="lede">동전을 100번 던지면 같은 면이 5번 연속 나오는 일이 거의 반드시 일어난다. 직관에 반하는 이 주장을 난수 시뮬레이션으로 먼저 확인했다.</p>
+
+    <h3>동기</h3>
+    <p>『원더풀 사이언스』(나탈리 앤지어)를 읽다가 놀런의 동전 던지기 실험을 접했다. 주장은 이렇다 — <strong>동전을 100번 던졌을 때 같은 면이 연속 5번 이상 나오는 사건이 발생할 확률은 95% 이상이다.</strong> 수학 시간에 배운 경우의 수와 확률로 이것이 정말인지 확인해 보고 싶었고, 확률의 관점과 코딩의 관점 양쪽에서 접근하기로 했다.</p>
+
+    <h3>난수 모듈을 이용한 시뮬레이션</h3>
+    <p>손으로 동전을 던져서는 시행 횟수가 턱없이 부족하다. 일반화된 결과를 얻으려면 시행이 많아야 한다는 것을 깨닫고 파이썬 <code>random</code> 모듈로 실험을 코드화했다.</p>
+
+    <pre><code>import random
+
+n = int(input("100번 던지는 시행 반복 횟수 입력: "))
+k = int(input("몇 번 연속으로 감지하고 싶은지 입력: "))
+prob = []
+
+for i in range(n):
+    coin_list = []
+    state = 1
+    for _ in range(100):
+        result = random.choice(["H", "T"])
+        coin_list.append(result)
+
+    for i in range(99):
+        if coin_list[i] == coin_list[i+1]:
+            state += 1
+            if state &gt;= k:
+                prob.append("T")
+                break
+        else:
+            state = 1
+
+print(f"100번 던지는 시행을 {n}번 했을 때 같은 면이 연속으로 {k}번 이상 나올 확률: {len(prob)/n}")</code></pre>
+
+    <figure data-file="images/fig1-code-random.png">
+      <img src="images/fig1-code-random.png" alt="난수 모듈을 이용한 동전 던지기 시뮬레이션 코드 화면">
+      <figcaption>[그림 1] 코드 구현 화면 1 — 난수 모듈 기반 시뮬레이션</figcaption>
+    </figure>
+
+    <h4>출력값 (k = 5 기준)</h4>
+    <div class="table-wrap">
+      <table>
+        <caption>[표 1] k=5일 때 시행 횟수 n의 변화에 따른 출력 확률</caption>
+        <thead>
+          <tr><th>구분</th><th>n = 100</th><th>n = 1,000</th><th>n = 10,000</th><th>n = 50,000</th><th>n = 100,000</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>시행 1</td><td>0.9800</td><td>0.9610</td><td>0.9710</td><td>0.9710</td><td>0.9721</td></tr>
+          <tr><td>시행 2</td><td>0.9700</td><td>0.9660</td><td>0.9698</td><td>0.9713</td><td>0.9717</td></tr>
+          <tr><td>시행 3</td><td>1.0000</td><td>0.9840</td><td>0.9695</td><td>0.9712</td><td>0.9712</td></tr>
+          <tr><td>시행 4</td><td>0.9800</td><td>0.9680</td><td>0.9728</td><td>0.9711</td><td>0.9721</td></tr>
+          <tr><td>시행 5</td><td>0.9600</td><td>0.9690</td><td>0.9715</td><td>0.9718</td><td>0.9725</td></tr>
+          <tr class="total"><td>평균값</td><td>0.9780</td><td>0.9696</td><td>0.97092</td><td>0.97128</td><td>0.97192</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>95% 이상이라는 주장은 성립했다. 다만 눈에 띄는 것은 값 자체보다 <strong>n이 커질수록 시행 간 편차가 급격히 줄어든다</strong>는 점이었다. 이 관찰은 03번 탭에서 큰 수의 법칙으로 다시 다룬다.</p>
+
+    <h3>동전은 정말 반반인가</h3>
+    <p>실험 도중 신문 기사를 통해 현실의 동전 던지기가 반반이 아니라는 것을 알게 되었다. 물리 법칙의 영향으로 <strong>던지기 전 위에 있던 면이 던진 후에도 다시 나올 확률이 약 51%</strong>라는 것이다. 추가 자료 조사에서는 초기 조건을 의도적으로 조작하면 이 확률이 <strong>68%까지</strong> 올라갈 수 있다는 내용도 확인했다.</p>
+
+    <h3>그렇다면 공정하게 만들 수 있는가</h3>
+    <p>동전 던지기가 공평하다는 통념과 위 사실이 충돌하는 것처럼 보였다. 여기서 의문이 생겼다 — 이 편향을 없애고 다시 공정하게 만들 방법은 없을까?</p>
+    <p>떠올린 방법은 이것이다. <strong>던지기 전 어느 면이 위로 오는지를 난수로, 즉 정확히 반반의 확률로 정하면 된다.</strong> 이를 코드로 구현했다.</p>
+
+    <pre><code>import random
+
+n = int(input("100번 던지는 시행 반복 횟수 입력: "))
+k = int(input("몇 번 연속으로 감지하고 싶은지 입력: "))
+success = 0
+
+for _ in range(n):
+    coin_list = []
+    for _ in range(100):
+        first = random.choice(["H", "T"])   # 던지기 전 위를 향한 면
+        if random.random() &lt; 0.51:          # 51%로 같은 면이 다시 나옴
+            result = first
+        else:
+            result = "T" if first == "H" else "H"
+        coin_list.append(result)
+
+    state = 1
+    for i in range(99):
+        if coin_list[i] == coin_list[i+1]:
+            state += 1
+            if state &gt;= k:
+                success += 1
+                break
+        else:
+            state = 1
+
+print(f"같은 면이 연속으로 {k}번 이상 나올 확률: {success/n:.4f}")</code></pre>
+
+    <figure data-file="images/fig2-code-fair.png">
+      <img src="images/fig2-code-fair.png" alt="초기 면을 난수로 정한 동전 던지기 코드 화면">
+      <figcaption>[그림 2] 코드 구현 화면 2 — 초기 조건을 난수로 보정</figcaption>
+    </figure>
+
+    <p>출력값은 앞의 결과와 크게 다르지 않았다. 정말 공정해진 것인지 수식으로 확인했다. 원리는 <strong>조건부 확률</strong>이다.</p>
+
+    <div class="eq">
+      $$\begin{aligned}
+      P(\text{앞면}) &amp;= P(\text{초기 앞면})\cdot P(\text{앞면}\mid\text{초기 앞면}) + P(\text{초기 뒷면})\cdot P(\text{앞면}\mid\text{초기 뒷면})\\[4pt]
+      &amp;= 0.5\times 0.51 + 0.5\times 0.49 = 0.5
+      \end{aligned}$$
+    </div>
+
+    <div class="callout">
+      <span class="label">결론</span>
+      <p>동전 자체의 물리적 편향(51%)이 남아 있어도, 초기 조건을 균등한 난수로 정해 주면 최종 확률은 정확히 0.5가 된다. 편향을 없애는 대신 <strong>편향이 걸리는 방향을 무작위화</strong>하는 것으로 공정성을 회복할 수 있다.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 03 마르코프 체인 ─────────── -->
+  <section class="panel" id="panel-3" role="tabpanel" aria-labelledby="tab-3" hidden>
+    <p class="kicker">Part 1 — Probability</p>
+    <h1>마르코프 체인과 수학적 확률</h1>
+    <p class="lede">시뮬레이션은 &ldquo;그런 것 같다&rdquo;까지만 말해 준다. 같은 값을 점화식과 전이행렬로 정확히 계산해, 통계적 확률이 어디로 수렴하는지 확인했다.</p>
+
+    <h3>상태를 정의하고 점화식 세우기</h3>
+    <p>&ldquo;지금까지 같은 면이 몇 번 연속되었는가&rdquo;를 상태로 잡으면 문제가 단순해진다. 동전을 \(n\)번 던질 때까지의 상황을 다섯 상태로 나눈다.</p>
+    <div class="eq">
+      $$\begin{aligned}
+      a_n &amp;= (\text{연속이 1번인 상태일 확률})\\
+      b_n &amp;= (\text{연속이 2번인 상태일 확률})\\
+      c_n &amp;= (\text{연속이 3번인 상태일 확률})\\
+      d_n &amp;= (\text{연속이 4번인 상태일 확률})\\
+      e_n &amp;= (\text{연속이 5번 이상 나온 적이 있는 상태일 확률})
+      \end{aligned}$$
+    </div>
+    <p>여기서 \(e_n\)은 <strong>흡수 상태(absorbing state)</strong>다. 한 번이라도 5연속이 나왔다면 이후 무슨 일이 일어나든 참으로 간주하므로, 한번 들어가면 빠져나오지 않는다.</p>
+    <div class="eq">
+      $$\begin{aligned}
+      a_{n+1} &amp;= 0.5a_n + 0.5b_n + 0.5c_n + 0.5d_n\\
+      b_{n+1} &amp;= 0.5a_n\\
+      c_{n+1} &amp;= 0.5b_n\\
+      d_{n+1} &amp;= 0.5c_n\\
+      e_{n+1} &amp;= e_n + 0.5d_n
+      \end{aligned}$$
+    </div>
+    <p>각 식의 의미는 단순하다. 직전과 다른 면이 나오면(확률 0.5) 연속이 끊겨 상태 \(a\)로 돌아가고, 같은 면이 나오면(확률 0.5) 한 칸 오른쪽으로 이동한다.</p>
+
+    <h3>마르코프 체인으로 도식화</h3>
+    <div class="svg-figure">
+      <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="다섯 상태 a,b,c,d,e로 이루어진 마르코프 체인 상태 전이도">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#2F5D50"/>
+          </marker>
+        </defs>
+        <g fill="none" stroke="#2F5D50" stroke-width="1.6" marker-end="url(#ah)">
+          <!-- 전진 -->
+          <path d="M132,110 Q170,72 208,110"/>
+          <path d="M252,110 Q290,72 328,110"/>
+          <path d="M372,110 Q410,72 448,110"/>
+          <path d="M492,110 Q530,72 568,110"/>
+          <!-- 복귀 -->
+          <path d="M230,152 Q180,205 110,145"/>
+          <path d="M350,152 Q240,235 108,150"/>
+          <path d="M470,152 Q300,262 106,155"/>
+          <!-- 자기 자신 -->
+          <path d="M78,95 Q30,60 46,110 Q30,160 78,125"/>
+          <path d="M622,95 Q670,60 654,110 Q670,160 622,125"/>
+        </g>
+        <g>
+          <circle cx="110" cy="130" r="26" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.8"/>
+          <circle cx="230" cy="130" r="26" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.8"/>
+          <circle cx="350" cy="130" r="26" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.8"/>
+          <circle cx="470" cy="130" r="26" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.8"/>
+          <circle cx="590" cy="130" r="26" fill="#2F5D50" stroke="#1E3F36" stroke-width="1.8"/>
+        </g>
+        <g font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" text-anchor="middle" fill="#1E3F36">
+          <text x="110" y="136">a</text><text x="230" y="136">b</text>
+          <text x="350" y="136">c</text><text x="470" y="136">d</text>
+          <text x="590" y="136" fill="#FFFFFF">e</text>
+        </g>
+        <g font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle" fill="#78867F">
+          <text x="170" y="72">0.5</text><text x="290" y="72">0.5</text>
+          <text x="410" y="72">0.5</text><text x="530" y="72">0.5</text>
+          <text x="176" y="196">0.5</text><text x="240" y="228">0.5</text><text x="300" y="252">0.5</text>
+          <text x="36" y="115">0.5</text><text x="666" y="115">1</text>
+        </g>
+        <text x="590" y="182" font-family="IBM Plex Mono, monospace" font-size="11" text-anchor="middle" fill="#78867F">흡수 상태</text>
+      </svg>
+    </div>
+    <p class="figcap">[그림 3] 다섯 상태의 전이 관계. 오른쪽으로 가면 연속이 늘고, 아래 곡선으로 돌아오면 연속이 끊긴다.</p>
+
+    <h3>전이행렬로 표현</h3>
+    <p>위 관계를 행렬 하나로 압축한다. 상태 순서는 \((a,b,c,d,e)\)다.</p>
+    <div class="eq">
+      $$P=\begin{bmatrix}
+      0.5 &amp; 0.5 &amp; 0 &amp; 0 &amp; 0\\
+      0.5 &amp; 0 &amp; 0.5 &amp; 0 &amp; 0\\
+      0.5 &amp; 0 &amp; 0 &amp; 0.5 &amp; 0\\
+      0.5 &amp; 0 &amp; 0 &amp; 0 &amp; 0.5\\
+      0 &amp; 0 &amp; 0 &amp; 0 &amp; 1
+      \end{bmatrix}$$
+    </div>
+
+    <h3>100번의 전이 계산하기</h3>
+    <p>동전을 100번 던진 결과는 \(P\)를 100번 곱한 것과 같다. 손으로는 불가능하므로 numpy를 이용했다.</p>
+    <pre><code>import numpy as np
+
+# 전이행렬 P (상태 순서: a, b, c, d, e)
+P = np.array([
+    [0.5, 0.5, 0.0, 0.0, 0.0],
+    [0.5, 0.0, 0.5, 0.0, 0.0],
+    [0.5, 0.0, 0.0, 0.5, 0.0],
+    [0.5, 0.0, 0.0, 0.0, 0.5],
+    [0.0, 0.0, 0.0, 0.0, 1.0],
+])
+
+P100 = np.linalg.matrix_power(P, 100)
+np.set_printoptions(precision=6, suppress=True)
+print("P^100 =")
+print(P100)</code></pre>
+
+    <figure data-file="images/fig5-matrix-code.png">
+      <img src="images/fig5-matrix-code.png" alt="numpy로 전이행렬을 100번 곱하는 코드와 출력값">
+      <figcaption>[그림 4] 코드 화면과 출력값 — 전이행렬의 100제곱</figcaption>
+    </figure>
+
+    <div class="eq">
+      $$P^{100}=\begin{bmatrix}
+      0.014155 &amp; 0.007344 &amp; 0.003810 &amp; 0.001976 &amp; \mathbf{0.972715}\\
+      0.013130 &amp; 0.006812 &amp; 0.003534 &amp; 0.001833 &amp; 0.974692\\
+      0.011153 &amp; 0.005786 &amp; 0.003002 &amp; 0.001557 &amp; 0.978501\\
+      0.007344 &amp; 0.003810 &amp; 0.001976 &amp; 0.001025 &amp; 0.985845\\
+      0 &amp; 0 &amp; 0 &amp; 0 &amp; 1
+      \end{bmatrix}$$
+    </div>
+    <p>구하려는 값은 <strong>a행 e열의 원소, 즉 0.972715</strong>다. 연속이 1인 상태에서 출발해 100번 던졌을 때 흡수 상태 \(e\)에 도달해 있을 확률이며, 이것이 수학적 확률이다.</p>
+
+    <h3>큰 수의 법칙 — 두 확률의 비교</h3>
+    <figure data-file="images/fig3-convergence.png">
+      <img src="images/fig3-convergence.png" alt="시행 횟수 n에 따른 통계적 확률과 수학적 확률 비교 그래프">
+      <figcaption>[그림 5] 시행횟수 n에 따른 통계적 확률과 수학적 확률(점선)</figcaption>
+    </figure>
+    <p>[표 1]의 평균값을 수학적 확률 0.972715와 비교하면, <strong>시행 횟수 n이 커질수록 통계적 확률이 수학적 확률로 수렴</strong>한다. 큰 수의 법칙이 눈으로 확인되는 지점이다.</p>
+
+    <figure data-file="images/fig4-range.png">
+      <img src="images/fig4-range.png" alt="n값에 따른 최대 변동폭 막대그래프">
+      <figcaption>[그림 6] n값에 따른 최대 변동폭(범위) 비교</figcaption>
+    </figure>
+    <p>수렴은 평균값에서만 일어나지 않는다. 5회 시행의 최대 변동폭(범위)을 보면 n이 커질수록 폭이 뚜렷하게 줄어든다. 원인은 이렇게 분석했다 — <strong>n이 커질수록 한 번의 예외적인 시행이 전체 확률에서 차지하는 비중이 작아지기 때문</strong>이다.</p>
+
+    <div class="callout">
+      <span class="label">정리</span>
+      <p>시뮬레이션(0.97192)과 전이행렬 계산(0.972715)이 소수 셋째 자리까지 일치했다. 놀런의 주장 &ldquo;95% 이상&rdquo;은 참이며, 실제 값은 약 <strong>97.3%</strong>다.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 04 리플 셔플 ─────────── -->
+  <section class="panel" id="panel-4" role="tabpanel" aria-labelledby="tab-4" hidden>
+    <p class="kicker">Part 2 — Combinatorics</p>
+    <h1>부분패턴과 리플 셔플</h1>
+    <p class="lede">카드는 많이 섞을수록 무작위에 가까워질까? 아니다. 무작위가 되는 <strong>임계점</strong>이 존재하고, 52장 기준으로 그 값은 7이다.</p>
+
+    <h3>부분패턴이란</h3>
+    <p>수열이나 도형 같은 전체 구조 안에서 발견되는, 부분적이고 규칙적인 구조를 <strong>부분패턴</strong>이라 한다. 전체 구조에 숨겨진 작은 단위들의 반복과 변형을 관찰하면 복잡한 시스템 속에서도 규칙성을 찾아낼 수 있다. 이 사이트의 04–07번 탭은 모두 이 관점 위에 있다.</p>
+
+    <h3>리플 셔플</h3>
+    <p>카드를 두 더미로 나눈 뒤 교차시켜 섞는 방식이다. 리플 셔플의 특징은 <strong>섞은 뒤에도 일정한 규칙성을 가진 부분집합이 남는다</strong>는 것이다. 이 잔여 규칙성이 바로 부분패턴이고, 무작위성을 측정하는 열쇠가 된다.</p>
+
+    <figure data-file="images/fig6-riffle.png">
+      <img src="images/fig6-riffle.png" alt="리플 셔플 과정 도해">
+      <figcaption>[그림 7] 리플 셔플 — 두 더미로 나눈 뒤 교차 낙하</figcaption>
+    </figure>
+
+    <p>대부분의 사람은 카드를 &ldquo;많이 섞을수록 무작위에 가까워진다&rdquo;고 생각한다. 하지만 무한히 섞을 필요는 없다. <strong>최적의 임계점이 존재</strong>한다.</p>
+
+    <h3>GSR 모델 — 셔플의 수학적 모형</h3>
+    <p>사람이 실제로 카드를 섞는 물리적 행동을 확률론적으로 모델링한 것이 GSR(Gilbert–Shannon–Reeds) 모델이다. 두 단계로 이루어진다.</p>
+
+    <h4>1단계 · 덱의 절단 (Cut)</h4>
+    <p>전체 \(n\)장 중 정확히 \(k\)장이 한 손으로 갈 확률은 이항분포를 따른다.</p>
+    <div class="eq">$$P(k)=\frac{\binom{n}{k}}{2^{n}}$$</div>
+    <p>손에 쥐는 장수 \(k\)를 고르는 경우의 수가 \(\binom{n}{k}\), 각 카드가 왼손·오른손으로 갈 확률이 각각 \(1/2\)이므로 전체는 \(2^n\)이다.</p>
+
+    <h4>2단계 · 카드의 맞물림 (Drop)</h4>
+    <p>왼손에 A장, 오른손에 B장이 남아 있을 때 각 손에서 카드가 떨어질 확률은 남은 장수에 비례한다. 즉 \(\dfrac{A}{A+B}\), \(\dfrac{B}{A+B}\).</p>
+
+    <h3>상승 수열 — 이론적 가교</h3>
+    <p><strong>상승 수열(rising sequence)</strong>은 셔플 후에도 카드가 원래 가지고 있던 상대적 앞뒤 순서를 그대로 유지하는 부분집합이다. 카드를 무작위로 섞는다는 것은 결국 <strong>상승 수열의 개수를 늘려 기존 정보(규칙성)를 파괴하는 과정</strong>이다.</p>
+    <div class="callout">
+      <span class="label">예시</span>
+      <p>\(\{1,2,3,4,5,6\}\) — 상승 수열 1개<br>
+      LEFT: \(\{1,2,3\}\) / RIGHT: \(\{4,5,6\}\) 로 나눠 리플 셔플 1회<br>
+      → \(\{4,1,2,3,5,6\}\) — 상승 수열 2개</p>
+    </div>
+
+    <h3>다이아코니스 정리</h3>
+    <p>페르시 다이아코니스는 위 개념들을 집대성해 결론을 냈다. \(n\)장의 카드를 \(k\)번 셔플했을 때, 상승 수열이 \(r\)개인 특정 배열 \(x\)가 나타날 확률은</p>
+    <div class="eq">$$Q^{*k}(x)=\frac{\dbinom{2^{k}+n-r}{n}}{2^{kn}}$$</div>
+    <p>분자는 \(n\)장을 \(k\)번 셔플해 상승 수열 \(r\)개를 만드는 총 가짓수, 분모는 \(k\)번 셔플의 전체 가짓수다.</p>
+
+    <h4>전변동거리 — 얼마나 섞였는지 재는 자</h4>
+    <p>이 확률 분포가 완전 무작위 상태(\(1/n!\))에서 얼마나 떨어져 있는지를 <strong>전변동거리(total variation distance)</strong>로 측정한다. 0에 가까울수록 완벽하게 섞인 것이다.</p>
+    <div class="eq">$$\left\lVert Q^{*k}-U \right\rVert=\frac{1}{2}\sum_{x\in S_{n}}\left| Q^{*k}(x)-\frac{1}{n!} \right|$$</div>
+    <ul>
+      <li>\(k\) — 셔플 횟수, 무작위 상태와 얼마나 떨어져 있는지를 결정</li>
+      <li>\(\tfrac12\) — 거리를 0과 1 사이로 정규화</li>
+      <li>\(S_n\) — 가능한 모든 배열</li>
+    </ul>
+
+    <h3>상전이 — 갑자기 섞인다</h3>
+    <p>결과는 극적이다. 전변동거리는 서서히 줄지 않고, 특정 임계점을 넘는 순간 급격히 떨어진다. 마르코프 체인에서 나타나는 <strong>상전이(phase transition)</strong> 현상이다.</p>
+    <div class="table-wrap">
+      <table>
+        <caption>[표 2] 52장 기준 셔플 횟수에 따른 전변동거리</caption>
+        <thead><tr><th>셔플 횟수 k</th><th>1–5회</th><th>6회</th><th>7회</th><th>8회</th></tr></thead>
+        <tbody>
+          <tr><td>전변동거리</td><td>≈ 1.00</td><td>급락 시작</td><td>0.33</td><td>0.16</td></tr>
+          <tr><td>상태</td><td>거의 안 섞임</td><td>전환점</td><td>실질적 무작위</td><td>충분히 무작위</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure data-file="images/fig7-tvd.png">
+      <img src="images/fig7-tvd.png" alt="셔플 횟수에 따른 전변동거리 변화 그래프">
+      <figcaption>[그림 8] 셔플 횟수와 전변동거리 — 7회 부근의 급격한 하강</figcaption>
+    </figure>
+
+    <h4>일반화</h4>
+    <p>정보이론(엔트로피)의 관점에서, 카드 덱의 순서를 완전히 지우는 데 필요한 정보량으로부터 일반식이 나온다.</p>
+    <div class="eq">$$k=\frac{3}{2}\log_{2}n$$</div>
+    <p>\(n=52\)를 대입하면 \(k\approx 8.55\)이고, 오차를 고려하면 실제 상전이 임계점은 <strong>7~8회</strong>다. 이 공식은 카드 장수와 무관하게 성립한다.</p>
+
+    <div class="callout">
+      <span class="label">의의</span>
+      <p>예측 불가능해 보이는 인간의 무작위적 행동을 수학의 언어로 통제하고 예측해 낸 사례다. 03번 탭의 동전 던지기가 &ldquo;충분히 반복하면 어디로 가는가&rdquo;를 물었다면, 여기서는 <strong>&ldquo;충분히&rdquo;가 정확히 몇 번인지</strong>에 답한다.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 05 램지 이론 ─────────── -->
+  <section class="panel" id="panel-5" role="tabpanel" aria-labelledby="tab-5" hidden>
+    <p class="kicker">Part 2 — Combinatorics</p>
+    <h1>램지 이론</h1>
+    <p class="lede">완전한 무질서는 불가능하다. 구조가 충분히 커지면 그 안에는 반드시 질서 있는 부분패턴이 생긴다.</p>
+
+    <h3>램지 이론이란</h3>
+    <p>꼭짓점의 개수가 충분히 큰 그래프에는 특정한 조건을 만족하는 부분 그래프가 <strong>반드시</strong> 존재한다. 앞 탭들이 &ldquo;무작위를 어떻게 만드는가&rdquo;를 다뤘다면, 램지 이론은 정반대 방향에서 <strong>무작위를 완전히 만드는 것은 불가능하다</strong>고 말한다.</p>
+
+    <h3>준비 — 그래프 용어</h3>
+    <ul>
+      <li><strong>그래프</strong> \(G=(V,E)\) — 꼭짓점(vertex) 집합 \(V\)와 변(edge) 집합 \(E\)</li>
+      <li><strong>완전그래프</strong> \(K_N\) — \(N\)개의 꼭짓점을 가지며 서로 다른 두 꼭짓점이 모두 변으로 연결된 그래프</li>
+      <li><strong>클리크(clique)</strong> — 그래프 \(H\)가 \(G\)의 클리크라는 것은 \(V(H)\subseteq V(G)\)이고 \(E(H)\subseteq E(G)\)이며 \(H\)가 완전그래프라는 뜻</li>
+      <li><strong>램지 수</strong> \(R(a,b)\) — 간선을 두 색으로 칠할 때 한 색의 \(K_a\) 또는 다른 색의 \(K_b\)가 반드시 나타나도록 만드는 완전그래프 꼭짓점의 최소 개수</li>
+    </ul>
+    <p>주의할 점 하나. \(a+b\)가 \(n\)과 항상 같은 것은 아니다.</p>
+
+    <h3>파티 문제</h3>
+    <div class="callout">
+      <span class="label">문제</span>
+      <p>어느 파티에 사람이 6명 모이면, 서로 모두 아는 3명이 존재하거나 서로 모두 모르는 3명이 반드시 존재한다.</p>
+    </div>
+    <p>이것을 그래프로 옮기면 \(R(3,3)\) 문제가 된다. 사람 = 꼭짓점, 두 사람의 관계 = 간선, &ldquo;아는 사이 / 모르는 사이&rdquo; = 두 가지 색이다. 아는 사이를 <strong>빨강</strong>, 모르는 사이를 <strong>파랑</strong>으로 칠하자. 그러면 문제는 이렇게 바뀐다 — <em>어떻게 칠하든 단색 삼각형(\(K_3\))이 반드시 생기는 최소 꼭짓점 수는?</em></p>
+
+    <h3>R(3,3) = 6 증명</h3>
+    <h4>① 6명이면 반드시 생긴다</h4>
+    <ol>
+      <li>임의의 한 사람 \(v\)를 고른다. \(v\)는 나머지 5명과 각각 빨강 또는 파랑 간선으로 연결된다.</li>
+      <li>간선 5개를 2가지 색으로 칠하면 <strong>비둘기집 원리</strong>에 의해 어느 한 색이 최소 3개 이상이다. 그 색을 빨강이라 하고, 빨강으로 연결된 세 사람을 \(x,y,z\)라 하자.</li>
+      <li>\(x,y,z\) 사이의 세 간선 중 하나라도 빨강이면 — 그 두 사람과 \(v\)가 빨강 삼각형을 이룬다.</li>
+      <li>세 간선이 모두 파랑이면 — \(x,y,z\) 자체가 파랑 삼각형이다.</li>
+      <li>따라서 어느 경우든 단색 삼각형이 존재한다. ∎</li>
+    </ol>
+
+    <h4>② 5명으로는 부족하다</h4>
+    <p>\(K_5\)의 꼭짓점을 오각형으로 배치하고, 오각형의 <strong>변 5개는 빨강</strong>, <strong>대각선 5개는 파랑</strong>으로 칠하면 단색 삼각형이 하나도 생기지 않는다. 이 반례 하나로 5는 답이 될 수 없다.</p>
+    <p>①과 ②를 합치면 \(R(3,3)=6\)이다.</p>
+
+    <figure data-file="images/fig8-ramsey.png">
+      <img src="images/fig8-ramsey.png" alt="R(3,3)=6 증명 그림 — K6의 2색 칠하기와 K5 반례">
+      <figcaption>[그림 9] \(K_6\)에서는 단색 삼각형이 반드시 생기고, \(K_5\)에는 반례가 존재한다</figcaption>
+    </figure>
+
+    <div class="callout">
+      <span class="label">이 탭의 요점</span>
+      <p>충분히 큰 구조 안에는 반드시 질서 있는 부분패턴이 생긴다. 이어지는 06–07번 탭에서는 방향을 바꿔, <strong>모든 부분패턴을 한 번씩만 담는 가장 짧은 구조</strong>를 직접 만들어 본다.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 06 드 브루인 수열 ─────────── -->
+  <section class="panel" id="panel-6" role="tabpanel" aria-labelledby="tab-6" hidden>
+    <p class="kicker">Part 2 — Combinatorics</p>
+    <h1>드 브루인 수열</h1>
+    <p class="lede">길이 n인 모든 문자열을 정확히 한 번씩만 담으면서, 가능한 한 짧은 순환열. 낭비가 0인 구조다.</p>
+
+    <h3>정의</h3>
+    <div class="callout">
+      <span class="label">De Bruijn sequence</span>
+      <p>\(B(k,n)\)은 \(k\)개의 원소 \(\{0,1,\dots,k-1\}\)로 이루어진 <strong>길이 \(n\)인 모든 부분수열을 정확히 한 번씩 포함</strong>하는 길이 \(k^{n}\)의 <strong>순환열</strong>이다.</p>
+    </div>
+    <ul>
+      <li><strong>길이</strong>: \(k^{n}\) — 길이 \(n\)인 문자열의 총 개수와 정확히 같다</li>
+      <li><strong>중복 없음</strong>: 모든 조합이 순환 구조 안에서 단 한 번만 나타난다</li>
+      <li><strong>순환</strong>: 끝과 처음이 이어져 있어 마지막 글자들도 낭비되지 않는다</li>
+    </ul>
+    <p>길이 \(n\)인 문자열 \(k^n\)개를 각각 따로 적으면 \(n\cdot k^n\)글자가 필요하다. 드 브루인 수열은 이것을 \(k^n\)글자로 줄인다. 이 압축률이 08번 탭에서 결정적으로 중요해진다.</p>
+
+    <h3>예시 — B(2, 3)</h3>
+    <p>\(k=2 \Rightarrow \{0,1\}\), \(n=3 \Rightarrow\) 부분수열 길이 3. 담아야 할 문자열은 8개다.</p>
+    <div class="eq">$$000\quad 001\quad 010\quad 011\quad 100\quad 101\quad 110\quad 111$$</div>
+    <p>이 8개를 모두 담는 길이 \(2^3=8\)의 순환열이 존재한다.</p>
+    <div class="eq">$$\mathbf{0\,0\,0\,1\,0\,1\,1\,1} \qquad \text{또는} \qquad 0\,0\,0\,1\,1\,1\,0\,1$$</div>
+    <p>확인해 보자. <code>00010111</code>을 순환으로 읽으면 <code>000</code>, <code>001</code>, <code>010</code>, <code>101</code>, <code>011</code>, <code>111</code>, <code>110</code>(끝에서 처음으로 넘어감), <code>100</code> — 정확히 8개가 한 번씩 나온다.</p>
+
+    <h3>부분 문자열은 어떻게 생성되는가</h3>
+    <p>여기서 그래프가 등장한다. 규칙은 단 두 줄이다.</p>
+    <div class="callout">
+      <span class="label">드 브루인 그래프의 구성</span>
+      <p><strong>정점</strong> = \((n-1)\)개짜리 문자열<br>
+         <strong>간선</strong> = 두 정점을 이었을 때 만들어지는 \(n\)개짜리 문자열</p>
+    </div>
+    <p>\(B(2,3)\)이라면 정점은 <code>00</code>, <code>01</code>, <code>10</code>, <code>11</code> 네 개, 간선은 8개다.</p>
+
+    <div class="svg-figure">
+      <svg viewBox="0 0 640 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="B(2,3)의 드 브루인 그래프. 정점 00, 01, 10, 11과 8개의 간선">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#2F5D50"/>
+          </marker>
+        </defs>
+        <g fill="none" stroke="#2F5D50" stroke-width="1.7" marker-end="url(#ah2)">
+          <path d="M212,80 L378,80"/>                          <!-- 00→01 : 001 -->
+          <path d="M420,116 L420,224"/>                        <!-- 01→11 : 011 -->
+          <path d="M378,260 L212,260"/>                        <!-- 11→10 : 110 -->
+          <path d="M170,224 L170,116"/>                        <!-- 10→00 : 100 -->
+          <path d="M390,112 Q300,150 208,228"/>                <!-- 01→10 : 010 -->
+          <path d="M212,232 Q320,208 398,120"/>                <!-- 10→01 : 101 -->
+          <path d="M158,50 Q120,4 82,42 Q52,80 148,72"/>       <!-- 00 self : 000 -->
+          <path d="M432,290 Q470,336 508,298 Q538,260 442,268"/><!-- 11 self : 111 -->
+        </g>
+        <g>
+          <circle cx="185" cy="80" r="34" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.9"/>
+          <circle cx="420" cy="80" r="34" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.9"/>
+          <circle cx="185" cy="260" r="34" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.9"/>
+          <circle cx="420" cy="260" r="34" fill="#EBF1EE" stroke="#2F5D50" stroke-width="1.9"/>
+        </g>
+        <g font-family="IBM Plex Mono, monospace" font-size="18" font-weight="600" text-anchor="middle" fill="#1E3F36">
+          <text x="185" y="87">00</text><text x="420" y="87">01</text>
+          <text x="185" y="267">10</text><text x="420" y="267">11</text>
+        </g>
+        <g font-family="IBM Plex Mono, monospace" font-size="13" text-anchor="middle" fill="#C0552F">
+          <text x="300" y="66">001</text>
+          <text x="452" y="176">011</text>
+          <text x="300" y="284">110</text>
+          <text x="140" y="176">100</text>
+          <text x="268" y="146">010</text>
+          <text x="336" y="208">101</text>
+          <text x="76" y="94">000</text>
+          <text x="536" y="252">111</text>
+        </g>
+      </svg>
+    </div>
+    <p class="figcap">[그림 10] \(B(2,3)\)의 드 브루인 그래프. 각 간선에 붙은 세 자리 문자열이 8개 부분수열 전부다.</p>
+
+    <p>이 그래프에서 <strong>모든 간선을 한 번씩 지나는 경로</strong>를 찾으면, 지나간 간선의 이름을 이어 붙인 것이 곧 드 브루인 수열이다.</p>
+    <div class="eq">$$00 \to 00 \to 01 \to 10 \to 01 \to 11 \to 11 \to 10 \to 00$$</div>
+    <p>이 경로가 지나는 간선은 순서대로 <code>000</code>, <code>001</code>, <code>010</code>, <code>101</code>, <code>011</code>, <code>111</code>, <code>110</code>, <code>100</code>. 정점의 첫 글자만 이어 읽으면 <code>00010111</code>이 나온다.</p>
+
+    <div class="callout">
+      <span class="label">핵심 명제</span>
+      <p>모든 드 브루인 수열에 대응하는 <strong>오일러 회로</strong>가 존재한다. 그리고 그 역도 성립한다.</p>
+    </div>
+
+    <h3>드 브루인 수열의 개수</h3>
+    <p>주어진 \(k,n\)에 대해 드 브루인 수열은 하나가 아니다. 개수는 다음과 같다.</p>
+    <div class="eq">$$\frac{(k!)^{\,k^{\,n-1}}}{k^{\,n}}$$</div>
+    <p>분자는 각 정점에서 나가는 간선들의 순서를 정하는 경우의 수, 분모 \(k^n\)은 순환열이므로 시작점을 어디로 잡아도 같은 수열인 만큼의 중복을 제거하는 항이다.</p>
+
+    <h4>BEST 정리</h4>
+    <p>유향 그래프에서 오일러 순환의 개수를 계산하는 일반 공식이 <strong>BEST 정리</strong>(de Bruijn, van Aardenne-Ehrenfest, Smith, Tutte)다.</p>
+    <div class="eq">$$\operatorname{ec}(G)=t_{w}(G)\prod_{v\in V}\bigl(\deg(v)-1\bigr)!$$</div>
+    <p>\(t_w(G)\)는 한 정점 \(w\)를 기준으로 한 방향 스패닝 트리의 개수다. 드 브루인 그래프에 대입하면 각 정점의 차수가 \(k\)이므로 \(\bigl((k-1)!\bigr)^{k^{n-1}}\)이 되고, 스패닝 트리 수는 \(k^{k^{n-1}-n+1}\)이 되어 위 개수 공식이 그대로 나온다.</p>
+
+    <p>그런데 여기서 자연스러운 의문이 남는다 — <strong>드 브루인 수열은 모든 \(k,n\)에 대해 항상 존재할까?</strong> 이 질문의 답은 다음 탭에 있다.</p>
+  </section>
+
+  <!-- ─────────── 07 오일러 회로 ─────────── -->
+  <section class="panel" id="panel-7" role="tabpanel" aria-labelledby="tab-7" hidden>
+    <p class="kicker">Part 2 — Combinatorics</p>
+    <h1>오일러 회로와 해밀턴 경로</h1>
+    <p class="lede">쾨니히스베르크의 다리에서 시작한 질문이, 드 브루인 수열의 존재성을 증명하는 도구가 된다.</p>
+
+    <h3>정의</h3>
+    <ul>
+      <li><strong>오일러 경로</strong> — 그래프의 모든 간선을 한 번씩만 통과하는 경로 (간선 중복 불가)</li>
+      <li><strong>오일러 회로</strong> — 오일러 경로이면서 출발점과 도착점이 일치하는 것</li>
+    </ul>
+
+    <h3>쾨니히스베르크의 다리</h3>
+    <p>강으로 나뉜 네 지역을 일곱 개의 다리가 잇는다. 모든 다리를 한 번씩만 건너 원래 자리로 돌아올 수 있는가? 그래프로 옮기면 정점 4개, 간선 7개이고 각 정점의 차수는 A: 5, B: 3, C: 3, D: 3이다.</p>
+
+    <figure data-file="images/fig9-konigsberg.png">
+      <img src="images/fig9-konigsberg.png" alt="쾨니히스베르크의 다리와 이를 옮긴 그래프">
+      <figcaption>[그림 11] 쾨니히스베르크의 다리 — 정점 4개, 간선 7개, 홀수 차수 정점 4개</figcaption>
+    </figure>
+
+    <p><strong>홀수 차수 정점이 4개</strong>다. 따라서 오일러 경로도, 오일러 회로도 존재하지 않는다. 답은 &ldquo;불가능하다&rdquo;.</p>
+
+    <h3>존재 조건 — 무향 그래프</h3>
+    <div class="table-wrap">
+      <table>
+        <caption>[표 3] 홀수 차수 정점의 개수에 따른 존재 여부</caption>
+        <thead><tr><th>홀수 차수 정점</th><th>오일러 경로</th><th>오일러 회로</th></tr></thead>
+        <tbody>
+          <tr><td>0개</td><td>존재</td><td>존재</td></tr>
+          <tr><td>2개</td><td>존재 (시작점 ≠ 끝점)</td><td>없음</td></tr>
+          <tr><td>4개 이상</td><td>없음</td><td>없음</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>이유는 단순하다. 어떤 정점을 지나갈 때마다 간선을 하나 쓰고 들어가서 하나 쓰고 나온다. 즉 <strong>간선은 항상 짝으로 소비</strong>된다. 짝이 맞지 않는 정점은 출발점이거나 도착점일 수밖에 없고, 그런 정점은 최대 2개까지만 허용된다.</p>
+
+    <h3>존재 조건 — 유향 그래프</h3>
+    <p>드 브루인 그래프는 방향이 있는 그래프다. <code>01 → 00</code>은 가능하지만 그 역은 다른 문자열을 뜻하므로 방향이 중요하다. 유향 그래프에서 오일러 회로의 조건은 이렇다.</p>
+    <div class="callout">
+      <span class="label">유향 오일러 그래프의 순환 조건</span>
+      <p>모든 정점에서 <strong>in-degree(들어오는 간선 수) = out-degree(나가는 간선 수)</strong>이고, 그래프가 연결되어 있을 것.</p>
+    </div>
+
+    <h3>드 브루인 수열은 항상 존재하는가</h3>
+    <p>이제 \(B(k,n)\)의 그래프에 위 조건을 적용해 보자. 정점은 \((n-1)\)자리 문자열이고, 임의의 정점 \(v = x_1x_2\cdots x_{n-1}\)에 대해</p>
+    <ul>
+      <li><strong>나가는 간선</strong>: 뒤에 \(k\)개 문자 중 하나를 붙여 \(x_2\cdots x_{n-1}y\) 로 이동 → <strong>out-degree = \(k\)</strong></li>
+      <li><strong>들어오는 간선</strong>: 앞에 \(k\)개 문자 중 하나를 붙인 \(y\,x_1\cdots x_{n-2}\) 에서 도착 → <strong>in-degree = \(k\)</strong></li>
+    </ul>
+    <p>예컨대 <code>0123 → 1234 → 2345</code>처럼 한 글자씩 밀리면서 이동하며, 이때 이어 붙인 <code>01234</code>, <code>12345</code>가 간선의 이름이 된다. 모든 정점에서 in-degree와 out-degree가 \(k\)로 같고, 임의의 두 문자열은 최대 \(n-1\)번의 이동으로 서로 도달 가능하므로 그래프는 강연결이다.</p>
+    <div class="callout">
+      <span class="label">결론</span>
+      <p>\(B(k,n)\)의 드 브루인 그래프는 <strong>모든 \(k,n\)에 대해 오일러 회로를 가진다.</strong> 따라서 드 브루인 수열은 항상 존재한다. ∎</p>
+    </div>
+
+    <h3>해밀턴 경로로의 변환</h3>
+    <p><strong>해밀턴 경로</strong>는 모든 정점을 한 번씩 방문하는 경로다. 오일러 경로가 <em>간선</em>을 모두 지나는 것과 대비된다.</p>
+    <p>드 브루인 그래프의 <strong>간선을 정점으로 바꾸면</strong> — 즉 \(n\)자리 문자열 하나하나를 정점으로 삼으면 — 같은 문제가 해밀턴 경로 문제로 바뀐다. \(B(2,3)\)의 경우 정점이 8개(<code>000</code>~<code>111</code>)인 그래프가 되고, 앞서 찾은 경로는 그대로 해밀턴 경로가 된다.</p>
+    <div class="eq">$$\text{드 브루인 수열} \;\longleftrightarrow\; \text{오일러 회로} \;\longleftrightarrow\; \text{해밀턴 경로}$$</div>
+    <p>세 표현은 같은 대상을 다르게 본 것이다. 그런데 <strong>계산 난이도는 전혀 같지 않다.</strong> 오일러 경로는 간선 수에 비례하는 선형 시간에 찾을 수 있지만, 해밀턴 경로 문제는 NP-완전이라 정점이 늘어나면 현실적으로 풀 수 없다. 같은 문제를 어느 쪽으로 번역하느냐가 실제로 풀리는지를 가른다.</p>
+    <p>이 차이가 왜 중요한지는 다음 탭에서 드러난다.</p>
+  </section>
+
+  <!-- ─────────── 08 생명과학 ─────────── -->
+  <section class="panel" id="panel-8" role="tabpanel" aria-labelledby="tab-8" hidden>
+    <p class="kicker">Application — Bioinformatics</p>
+    <h1>유전체 조립 — 생명과학과의 연관성</h1>
+    <p class="lede">30억 염기쌍짜리 인간 유전체를, 시퀀서는 150염기짜리 조각으로만 읽는다. 이 조각들을 되돌리는 문제가 정확히 드 브루인 그래프 위의 오일러 경로 문제다.</p>
+
+    <h3>문제 상황 — 짧은 조각만 주어진다</h3>
+    <p>차세대 시퀀싱(NGS)은 유전체를 통째로 읽지 못한다. DNA를 무작위로 잘게 부순 뒤 각 조각의 앞부분 100~300염기만 읽어 내는데, 이 조각을 <strong>read</strong>라 한다. 인간 유전체 하나를 읽으면 수억 개의 read가 나오고, <strong>이들이 원래 어느 위치에서 왔는지에 대한 정보는 전혀 남지 않는다.</strong> 순서를 잃어버린 수억 조각으로 원본을 복원하는 것이 <strong>유전체 조립(genome assembly)</strong>이다.</p>
+
+    <figure data-file="images/fig10-assembly.png">
+      <img src="images/fig10-assembly.png" alt="시퀀싱 read로부터 유전체를 조립하는 과정 개요">
+      <figcaption>[그림 12] 유전체 조립의 흐름 — 시퀀싱 → k-mer 분해 → 그래프 구성 → 경로 탐색</figcaption>
+    </figure>
+
+    <h3>read를 k-mer로 쪼개기</h3>
+    <p>조립 알고리즘은 read를 그대로 쓰지 않고 길이 \(k\)의 부분 문자열, 즉 <strong>k-mer</strong>로 잘게 나눈다. 예를 들어 read <code>ATGGCGT</code>를 \(k=3\)으로 나누면 <code>ATG</code>, <code>TGG</code>, <code>GGC</code>, <code>GCG</code>, <code>CGT</code>가 된다.</p>
+    <p>여기서 06번 탭의 구성 규칙이 그대로 적용된다.</p>
+    <div class="callout">
+      <span class="label">유전체 드 브루인 그래프</span>
+      <p><strong>정점</strong> = \((k-1)\)-mer &nbsp;·&nbsp; <strong>간선</strong> = k-mer<br>
+      알파벳은 \(\{A,\,T,\,G,\,C\}\)이므로 \(k=4\)로 두면 정확히 \(B(4,k)\)의 구조가 된다.</p>
+    </div>
+    <p>\(k=3\)이라면 <code>ATG</code>라는 k-mer는 정점 <code>AT</code>에서 정점 <code>TG</code>로 가는 간선이 된다. 모든 read의 모든 k-mer를 간선으로 넣고 나면, <strong>원본 유전체는 이 그래프에서 모든 간선을 한 번씩 지나는 경로</strong>가 된다. 즉 <strong>조립 = 오일러 경로 찾기</strong>다.</p>
+
+    <h3>왜 오일러 경로인가 — 07번 탭이 결정적인 이유</h3>
+    <p>초기 조립 알고리즘은 다른 방식을 썼다. read 하나를 정점으로 두고 겹치는 read를 간선으로 잇는 <strong>중첩 그래프(overlap graph)</strong> 방식인데, 이때 조립은 모든 정점을 한 번씩 지나는 <strong>해밀턴 경로</strong> 문제가 된다.</p>
+    <div class="table-wrap">
+      <table>
+        <caption>[표 4] 두 접근의 계산 복잡도 차이</caption>
+        <thead><tr><th>접근</th><th>정점</th><th>찾는 것</th><th>복잡도</th></tr></thead>
+        <tbody>
+          <tr><td>중첩 그래프</td><td>read (수억 개)</td><td>해밀턴 경로</td><td>NP-완전</td></tr>
+          <tr class="total"><td>드 브루인 그래프</td><td>(k−1)-mer (최대 4<sup>k−1</sup>개)</td><td>오일러 경로</td><td>선형 시간</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>정점 수가 수억 개인 그래프에서 해밀턴 경로를 찾는 것은 현실적으로 불가능하다. 반면 드 브루인 그래프는 정점 수가 <strong>read 개수와 무관하게</strong> 알파벳 크기로만 제한되고, 오일러 경로는 간선 수에 비례하는 시간에 찾을 수 있다.</p>
+    <div class="callout">
+      <span class="label">이 프로젝트의 결론</span>
+      <p>07번 탭에서 &ldquo;드 브루인 수열 ↔ 오일러 회로 ↔ 해밀턴 경로&rdquo;가 같은 대상의 세 표현이라는 것을 확인했다. 유전체 조립은 그 <strong>번역이 실제로 무엇을 바꾸는지</strong> 보여주는 사례다. 문제 자체는 같지만, 어느 그래프 위에 올려놓느냐가 &ldquo;풀 수 없음&rdquo;과 &ldquo;선형 시간에 풀림&rdquo;을 가른다.</p>
+    </div>
+
+    <h3>반복서열 — 그래프가 갈라지는 지점</h3>
+    <p>이론이 그대로 통하지는 않는다. 실제 유전체에는 같은 서열이 여러 번 등장하는 <strong>반복서열(repeat)</strong>이 많고, 인간 유전체의 절반가량이 여기 해당한다. 길이가 \(k\) 이상인 반복서열은 그래프에서 <strong>같은 정점으로 수렴</strong>해 버린다.</p>
+    <p>그 결과 한 정점에 여러 개의 나가는 간선이 생기고, 오일러 경로가 여러 개 존재하게 된다. 06번 탭에서 계산한 &ldquo;드 브루인 수열의 개수&rdquo; 공식이 여기서는 반가운 소식이 아니다. <strong>경로가 여러 개라는 것은 원본 서열 후보가 여러 개라는 뜻</strong>이고, 어느 것이 진짜인지 그래프만으로는 알 수 없다.</p>
+
+    <h4>k 선택의 트레이드오프</h4>
+    <ul>
+      <li><strong>k가 작으면</strong> — 정점이 적어 그래프가 가볍지만, 서로 다른 위치의 서열이 우연히 같아질 확률이 커져 분기가 폭증한다</li>
+      <li><strong>k가 크면</strong> — 반복서열을 건너뛸 수 있어 분기가 줄지만, read보다 길 수 없고 시퀀싱 오류에 취약해진다</li>
+    </ul>
+    <p>실제 조립기는 여러 \(k\)로 그래프를 만들어 결과를 합치는 multi-k 전략을 쓴다.</p>
+
+    <h3>여기서 확률이 다시 필요해진다</h3>
+    <p>조립이 성공하려면 애초에 <strong>모든 위치가 read로 덮여 있어야</strong> 한다. 이것은 확률 문제다. 유전체 길이 \(G\), read 길이 \(L\), read 개수 \(N\)일 때 커버리지는</p>
+    <div class="eq">$$c=\frac{LN}{G}$$</div>
+    <p>read가 유전체 위에 무작위로 떨어진다고 가정하면, 특정 염기가 어떤 read에도 덮이지 않을 확률은 포아송 분포에 따라 다음과 같다(<strong>Lander–Waterman 모형</strong>).</p>
+    <div class="eq">$$P(\text{덮이지 않음}) = e^{-c}$$</div>
+    <div class="table-wrap">
+      <table>
+        <caption>[표 5] 커버리지에 따른 미커버 비율</caption>
+        <thead><tr><th>커버리지 c</th><th>1×</th><th>5×</th><th>10×</th><th>30×</th></tr></thead>
+        <tbody>
+          <tr><td>덮이지 않을 확률</td><td>36.8%</td><td>0.67%</td><td>0.0045%</td><td>9.4×10<sup>−14</sup></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>30× 이상이 사실상의 표준인 이유가 여기 있다. 커버리지를 늘리는 것은 02번 탭에서 시행 횟수 \(n\)을 100에서 100,000까지 늘렸던 것과 정확히 같은 논리다. <strong>한 번의 예외적인 사건이 전체에서 차지하는 비중을 줄이는 것</strong> — 큰 수의 법칙이 여기서도 그대로 작동한다.</p>
+    <p>k-mer의 중복 확률도 같은 방식으로 따질 수 있다. 길이 \(k\)의 서열은 \(4^{k}\)가지이므로, 무작위 서열이라면 특정 k-mer가 우연히 두 번 나타날 확률은 생일 문제와 같은 구조를 가진다. \(k=21\)이면 \(4^{21}\approx 4.4\times 10^{12}\)로 인간 유전체 길이보다 훨씬 크므로 우연한 충돌은 거의 없고, 실제 조립기가 \(k\)를 21~127 범위로 잡는 근거가 된다.</p>
+
+    <h3>실제로 쓰이는 도구들</h3>
+    <ul>
+      <li><strong>Velvet</strong> (2008) — 드 브루인 그래프 조립을 대중화한 초기 도구</li>
+      <li><strong>SPAdes</strong> — multi-k 전략을 쓰는 현재의 표준 조립기 중 하나</li>
+      <li><strong>ABySS</strong> — 대용량 유전체를 분산 처리하도록 설계된 조립기</li>
+    </ul>
+
+    <h3>마무리</h3>
+    <p>이 포트폴리오는 동전 하나에서 시작했다. 100번 던지면 같은 면이 5번 연속 나오는가라는 질문에서 출발해, 시뮬레이션과 전이행렬로 답을 구하고, 무작위성이 만들어지는 임계점을 지나, 모든 부분패턴을 낭비 없이 담는 구조에 도착했다.</p>
+    <p>그리고 그 구조는 지금 이 순간에도 전 세계의 시퀀싱 센터에서 유전체를 복원하는 데 쓰이고 있다. 순수한 조합론의 대상이 생명과학의 기본 도구가 되는 과정을 따라가 보는 것이 이 탐구의 목적이었다.</p>
+
+    <div class="refs">
+      <h4>참고 자료</h4>
+      <ol>
+        <li>나탈리 앤지어, 『원더풀 사이언스』</li>
+        <li>곽노필, &ldquo;&lsquo;동전 던지기&rsquo; 앞뒷면 확률은 반반? 아니었다&rdquo;, 한겨레, 2024-06-29. <a href="https://www.hani.co.kr/arti/science/science_general/1112556.html" target="_blank" rel="noopener">기사 링크</a></li>
+        <li>Persi Diaconis, Susan Holmes, Richard Montgomery, &ldquo;Dynamical Bias in the Coin Toss&rdquo;, <em>SIAM Review</em>. <a href="https://doi.org/10.1137/S0036144504446436" target="_blank" rel="noopener">doi:10.1137/S0036144504446436</a></li>
+        <li>D. Bayer, P. Diaconis, &ldquo;Trailing the Dovetail Shuffle to its Lair&rdquo;, <em>Annals of Applied Probability</em>, 1992.</li>
+        <li>N. G. de Bruijn, &ldquo;A Combinatorial Problem&rdquo;, 1946.</li>
+        <li>P. A. Pevzner, H. Tang, M. S. Waterman, &ldquo;An Eulerian path approach to DNA fragment assembly&rdquo;, <em>PNAS</em>, 2001.</li>
+        <li>E. S. Lander, M. S. Waterman, &ldquo;Genomic mapping by fingerprinting random clones&rdquo;, <em>Genomics</em>, 1988.</li>
+        <li>조합론 발표자료 &lsquo;Partial Patterns — 리플 셔플, 램지 이론, 드 브루인 수열, 오일러 회로&rsquo;</li>
+      </ol>
+    </div>
+  </section>
+
+  </main>
+</div>
+
+<script>
+/* ── 탭 전환 ─────────────────────────────────────────── */
+(function(){
+  const tabs   = Array.from(document.querySelectorAll('.tab'));
+  const panels = Array.from(document.querySelectorAll('.panel'));
+
+  function activate(index, pushHash){
+    tabs.forEach((t,i)=>{
+      const on = i === index;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      panels[i].hidden = !on;
+      if(on){
+        panels[i].classList.remove('panel-in');
+        void panels[i].offsetWidth;      // 애니메이션 재시작
+        panels[i].classList.add('panel-in');
+      }
+    });
+    if(pushHash){
+      history.replaceState(null, '', '#' + (index + 1));
+      window.scrollTo({top:0, behavior:'smooth'});
+      tabs[index].scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+    }
+  }
+
+  tabs.forEach((tab,i)=>{
+    tab.addEventListener('click', ()=> activate(i, true));
+    tab.addEventListener('keydown', e=>{
+      const map = {ArrowDown:1, ArrowRight:1, ArrowUp:-1, ArrowLeft:-1};
+      if(!(e.key in map)) return;
+      e.preventDefault();
+      const next = (i + map[e.key] + tabs.length) % tabs.length;
+      tabs[next].focus();
+      activate(next, true);
+    });
+  });
+
+  // 주소창의 #번호로 바로 열기 (예: project.html#8)
+  const n = parseInt(location.hash.replace('#',''), 10);
+  if(n >= 1 && n <= tabs.length) activate(n - 1, false);
+})();
+
+/* ── 이미지가 없을 때 자리표시 상자 표시 ────────────────── */
+document.querySelectorAll('figure[data-file] img').forEach(img=>{
+  img.addEventListener('error', ()=> img.closest('figure').classList.add('missing'));
+  if(img.complete && img.naturalWidth === 0) img.closest('figure').classList.add('missing');
+});
+
+/* ── 수식 렌더링 ─────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', ()=>{
+  function render(){
+    if(!window.renderMathInElement){ setTimeout(render, 60); return; }
+    renderMathInElement(document.body, {
+      delimiters:[
+        {left:'$$', right:'$$', display:true},
+        {left:'\\[', right:'\\]', display:true},
+        {left:'\\(', right:'\\)', display:false}
+      ],
+      throwOnError:false
+    });
+  }
+  render();
+});
+</script>
+
+</body>
+</html>
